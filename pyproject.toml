@@ -1,0 +1,23 @@
+[project]
+name = "dataklasses"
+version = "0.1.0"
+description = "Simple creation of dataclasses from JSON"
+readme = "README.md"
+authors = [
+    { name = "Uri Granta", email = "uri.granta+python@gmail.com" }
+]
+requires-python = ">=3.10.15"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "jsonschema>=4.23.0",
+    "mypy>=1.13.0",
+    "pytest>=8.3.3",
+    "ruff>=0.7.1",
+    "types-jsonschema>=4.23.0.20240813",
+]

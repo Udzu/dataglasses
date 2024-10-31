@@ -1,6 +1,6 @@
 # dataklasses
 
-A mini-package to simplify the creation of dataclasses from JSON.
+A small package to simplify creating dataclasses from JSON and validating that JSON.
 
 ## Installation
 
@@ -10,7 +10,9 @@ $ pip install dataklasses
 
 ## Requirements
 
-Python 3.10 or later. No other requirements, but if you wish to validate arbitrary JSON data against the generated JSON schemas, consider installing [jsonschema](https://github.com/python-jsonschema/jsonschema) (though this is unnecessary when using `dataklasses` to convert JSON into dataclasses).
+Requires Python 3.10 or later.
+
+If you wish to validate arbitrary JSON data against the generated JSON schemas in Python, consider installing [jsonschema](https://github.com/python-jsonschema/jsonschema), though this is unnecessary when using `dataklasses` to convert JSON into dataclasses.
 
 ## Quick start
 
@@ -63,7 +65,11 @@ InventoryItem(name='widget', unit_price=3.0, quantity_on_hand=0)
 ```
 </details>
 
-## Purpose
+## Objective
+
+The purpose of this library is to speed up rapid development by making it trivial to populate type-annotated dataclasses with dictionary data extracted from JSON, as well as to perform basic validation on that data. The library contains just one file and two functions, so can even be directly copied into a project.
+
+It is not intended for complex validation or high performance. For those, consider using [pydantic](https://github.com/pydantic/pydantic).
 
 ## Usage
 
@@ -78,16 +84,19 @@ def from_dict(
     transform: Optional[TransformRules] = None,
 ) -> T
 ````
-This converts a nested dictionary `value` of input data into the given dataclass type `cls`, raising a `TypeError` if the conversion is not possible. (The optional keyword arguments are described below.)
+This converts a nested dictionary `value` of input data into the given dataclass type `cls`, raising an exception if the conversion is not possible. (The optional keyword arguments are described further down.)
 
 ```python
 def to_json_schema(
-    cls: type, *, strict: bool = False, transform: Optional[TransformRules] = None
+    cls: type,
+    *,
+    strict: bool = False,
+    transform: Optional[TransformRules] = None,
 ) -> dict[str, Any]:
 ```
-This generates a JSON schema representing valid inputs for the dataclass type `cls`, raising a `ValueError` if the class cannot be represented in JSON.  (Again, the optional keyword arguments are described below.)
+This generates a JSON schema representing valid inputs for the dataclass type `cls`, raising an exception if the class cannot be represented in JSON.  (Again, the optional keyword arguments are described further down.)
 
-Below is a summary of the different supported use cases.
+Below is a summary of the different supported use cases:
 
 ### Nested structures
 
@@ -106,9 +115,9 @@ Dataclasses can be nested, using either global or local definitions.
 ...     location: GPS
 
 >>> from_dict(TrackedItem, {
-...     "item": { "name": "pi", "unit_price": 42},
+...     "item": { "name": "pie", "unit_price": 42},
 ...     "location": { "lat": 52.2, "long": 0.1 } })
-TrackedItem(item=InventoryItem(name='pi', unit_price=42, quantity_on_hand=0),
+TrackedItem(item=InventoryItem(name='pie', unit_price=42, quantity_on_hand=0),
 location=TrackedItem.GPS(lat=52.2, long=0.1))
 
 >>> print(dumps(to_json_schema(TrackedItem), indent=2))
@@ -178,14 +187,223 @@ location=TrackedItem.GPS(lat=52.2, long=0.1))
 
 ### Collection types
 
+There is automatic support for the generic collection types most compatible with JSON: `list[T]`, `tuple[...]`  and `Sequence[T]` (encoded as arrays) and `dict[str, T]` and `Mapping[str, T]` (encoded as objects).
+
+```python
+>>> from collections.abc import Mapping, Sequence
+
+>>> @dataclass
+... class Catalog:
+...     items: Sequence[InventoryItem]
+...     publisher: tuple[str, int]
+...     purchases: Mapping[str, int]
+    
+>>> from_dict(Catalog, {
+...     "items": [{ "name": "widget", "unit_price": 3.0}],
+...     "publisher": ["ACME", 1982],
+...     "purchases": { "Wile E. Coyote": 52}})
+Catalog(items=[InventoryItem(name='widget', unit_price=3.0, quantity_on_hand=0)],
+publisher=('ACME', 1982), purchases={'Wile E. Coyote': 52})    
+
+>>> print(dumps(to_json_schema(Catalog), indent=2))
+```
+
+<details>
+<summary>print output...</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/Catalog",
+  "$defs": {
+    "Catalog": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/InventoryItem"
+          }
+        },
+        "publisher": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "purchases": {
+          "type": "object",
+          "patternProperties": {
+            "^.*$": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "required": [
+        "items",
+        "publisher",
+        "purchases"
+      ]
+    },
+    "InventoryItem": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "unit_price": {
+          "type": "number"
+        },
+        "quantity_on_hand": {
+          "type": "integer",
+          "default": 0
+        }
+      },
+      "required": [
+        "name",
+        "unit_price"
+      ]
+    }
+  }
+}
+```
+</details>
+
+Unrestricted types like `list` or `dict` (or `set` or `Any`) and mappings with non-`str` keys can be used with `from_dict` but not with `to_json_schema`. Alternatively, these, alongside unsupported generic types like `set[T]`, can be used with both `from_dict` and `to_json_schema` by defining an appropriate encoding transformation (see section below). 
+
 ### Optional and Union types
+
+Union types (`S | T` or `Union[S, T, ...]`) are matched against all their permitted subtypes in order, returning the first successful match, or raising an exception if there are none. Optional types (`T | None` or `Optional[T]`) are handled similarly. Note that an optional type is not the same as an optional field (i.e. one with a default): a field with an optional type is still a required field unless it has a default value (which could be `None` but could also be something else).
+
+```python
+>>> from typing import Optional
+
+>>> @dataclass
+... class ItemPurchase:
+...     items: Sequence[InventoryItem | TrackedItem]
+...     invoice: Optional[int] = None
+    
+>>> from_dict(ItemPurchase, {
+...     "items": [{
+...         "item": { "name": "pie", "unit_price": 42},
+...         "location": { "lat": 52.2, "long": 0.1 } }],
+...     "invoice": 1234})
+ItemPurchase(items=[TrackedItem(item=
+InventoryItem(name='pie', unit_price=42, quantity_on_hand=0),
+location=TrackedItem.GPS(lat=52.2, long=0.1))], invoice=1234)
+
+>>> print(dumps(to_json_schema(ItemPurchase), indent=2))
+```
+
+<details>
+<summary>print output...</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/ItemPurchase",
+  "$defs": {
+    "ItemPurchase": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/InventoryItem"
+              },
+              {
+                "$ref": "#/$defs/TrackedItem"
+              }
+            ]
+          }
+        },
+        "invoice": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
+    "InventoryItem": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "unit_price": {
+          "type": "number"
+        },
+        "quantity_on_hand": {
+          "type": "integer",
+          "default": 0
+        }
+      },
+      "required": [
+        "name",
+        "unit_price"
+      ]
+    },
+    "TrackedItem": {
+      "type": "object",
+      "properties": {
+        "item": {
+          "$ref": "#/$defs/InventoryItem"
+        },
+        "location": {
+          "$ref": "#/$defs/TrackedItem.GPS"
+        }
+      },
+      "required": [
+        "item",
+        "location"
+      ]
+    },
+    "TrackedItem.GPS": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number"
+        },
+        "long": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "lat",
+        "long"
+      ]
+    }
+  }
+}
+```
+</details>
 
 ### Enum and Literal types
 
-Both `Enum` and `Literal` types can be used to match explicit enumerations. `Enum` types match both the values and symbolic names (preferring the former in case of a clash).
+Both `Enum` and `Literal` types can be used to match explicit enumerations. By default, `Enum` types match both the values and symbolic names (preferring the former in case of a clash). This behaviour can be overridden using a transformation if desired (see section below). 
 
 ```python
 >>> from enum import auto, StrEnum
+>>> from typing import Literal
 
 >>> class BuildType(StrEnum):
 ...     DEBUG = auto()
@@ -240,7 +458,7 @@ Release(build=<Build.DEBUG: 'debug'>, approved='Yes')
 
 ### Annotated types
 
- `Annotated` types are used to populate the property `"description"` annotations in the JSON schema. 
+ `Annotated` types can be used to populate the property `"description"` annotations in the JSON schema. 
 
 ```python
 >>> from typing import Annotated
@@ -294,7 +512,7 @@ InventoryItem(name='widget', unit_price=3.0, quantity_on_hand=0)
 
 ### Forward references
 
-Forward reference types (encoded as string literals or `ForwardRef` objects) are handled automatically, permitting recursive dataclasses. Both global and local references are supported.
+Forward reference types (written as string literals or `ForwardRef` objects) are handled automatically, permitting recursive dataclasses. Both global and local references are supported.
 
 ```python
 >>> @dataclass
@@ -352,7 +570,7 @@ Forward reference types (encoded as string literals or `ForwardRef` objects) are
 
 ### Strict mode
 
-Both `from_dict` and `to_json_schema` default to ignoring additional properties that are not part of the dataclass. This can be disabled with the `strict` keyword.
+Both `from_dict` and `to_json_schema` default to ignoring additional properties that are not part of a dataclass (similar to `additionalProperties` defaulting to true in JSON schemas). This can be disabled with the `strict` keyword.
 ```python
 >>> value = { "name": "widget", "unit_price": 4.0, "comment": "too expensive"}
 
@@ -402,3 +620,61 @@ TypeError: Unexpected <class '__main__.InventoryItem'> fields {'comment'}
 
 ### Transformations
 
+Transformations allow you to override the handling of specific types or dataclass fields, and can be used to normalise inputs or convert them into different types, including ones that aren't normally supported. Transformations are specified with the `transform` keyword, using a mapping:
+
+* the mapping keys are either:
+  * a type used somewhere in the output dataclass: e.g. `str` or `set[int]`
+  * a dataclass field specified by a class-name tuple: e.g. `(InventoryItem, "name")` or `(Cons, "head")`
+* the mapping values are a tuple consisting of:
+  * the JSON-serialisable input type that we want to represent this output type or field
+  * a callable function to convert from that input type to the output type
+
+Note that the input type can be the same as the output type. Conversely, note that transformations don't help with serialising the dataclasses *back* into JSON from non-serialisable types.
+
+```python
+>>> @dataclass
+... class Person:
+...     name : str
+...     aliases: set[str]
+
+>>> transform = {
+...     str: (str, str.title),
+...     set[str]: (list[str], set),
+...     (Person, "name"): (str, lambda s: s + "!")}
+    
+>>> from_dict(Person, {"name": "robert", "aliases": ["bob", "bobby"]}, transform=transform)
+Person(name='Robert!', aliases={'Bobby', 'Bob'})
+    
+>>> print(dumps(to_json_schema(Person, transform=transform), indent=2))
+```
+
+<details>
+<summary>print output...</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/Person",
+  "$defs": {
+    "Person": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "aliases"
+      ]
+    }
+  }
+}
+```
+</details>

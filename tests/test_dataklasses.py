@@ -439,25 +439,24 @@ class DataclassUnsupportedInSchema:
     a: list
     b: set
     c: Any
+    d: Mapping[int, int]
 
 
 def test_unsupported_in_schema_types() -> None:
-    data = from_dict(
-        DataclassUnsupportedInSchema, {"a": [1, "?"], "b": {2, "!"}, "c": 1}
-    )
-    assert data == DataclassUnsupportedInSchema([1, "?"], {2, "!"}, 1)
-    assert_invalid_value(
-        DataclassUnsupportedInSchema,
-        {"a": {1, "?"}, "b": {2, "!"}, "c": 1},
-        "value, got",
-        valid_schema=False,
-    )
-    assert_invalid_value(
-        DataclassUnsupportedInSchema,
-        {"a": [], "b": {}, "c": 1},
-        "value, got",
-        valid_schema=False,
-    )
+    value = {"a": [1, "?"], "b": {2, "!"}, "c": 1, "d": {1: 2}}
+    data = from_dict(DataclassUnsupportedInSchema, value)
+    assert data == DataclassUnsupportedInSchema([1, "?"], {2, "!"}, 1, {1: 2})
+    for value in [
+        {"a": {1, "?"}, "b": {2, "!"}, "c": 1, "d": {1: 2}},
+        {"a": [], "b": {}, "c": 1, "d": {1: 2}},
+        {"a": [], "b": {}, "c": 1, "d": {"1": 2}},
+    ]:
+        assert_invalid_value(
+            DataclassUnsupportedInSchema,
+            value,
+            "value, got",
+            valid_schema=False,
+        )
 
 
 def test_unsupported_in_schema_transform() -> None:
@@ -465,10 +464,14 @@ def test_unsupported_in_schema_transform() -> None:
         list: (list[int | str], lambda x: x),
         set: (list[int | str], set),
         Any: (int, str),  # type:ignore[dict-item]
+        Mapping[int, int]: (
+            dict[str, int],
+            lambda d: {int(k): v for k, v in d.items()},
+        ),
     }
-    value = {"a": [1, "?"], "b": [2, "!"], "c": 1}
+    value = {"a": [1, "?"], "b": [2, "!"], "c": 1, "d": {"1": 2}}
     data = from_dict(DataclassUnsupportedInSchema, value, transform=transform)
-    assert data == DataclassUnsupportedInSchema([1, "?"], {2, "!"}, "1")
+    assert data == DataclassUnsupportedInSchema([1, "?"], {2, "!"}, "1", {1: 2})
     schema = to_json_schema(type(data), transform=transform)
     validate(value, schema)
 

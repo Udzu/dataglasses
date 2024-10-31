@@ -19,7 +19,7 @@ import pytest
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
-from dataklasses import from_dict, to_json_schema
+from dataklasses import TransformRules, from_dict, to_json_schema
 from tests.forward_dataclass import DataclassForward, DataclassGlobal
 
 
@@ -390,30 +390,101 @@ def test_forward_references(data: Any) -> None:
     assert_asdict_inverse(data)
 
 
+# ==========
+# TRANSFORMS
+# ==========
+
+
+@dataclass
+class DataclassTransform:
+    a: str
+    b: str
+    c: list[str]
+    d: Optional[str] = None
+
+
+@pytest.mark.parametrize(
+    "transform,output",
+    [
+        ({str: (str, str.title)}, DataclassTransform("Hi", "Bye", ["Die!"])),
+        (
+            {(DataclassTransform, "a"): (str, str.title)},
+            DataclassTransform("Hi", "bye", ["DIE!"]),
+        ),
+        (
+            {(DataclassTransform, "a"): (Literal["hi"], str.title)},
+            DataclassTransform("Hi", "bye", ["DIE!"]),
+        ),
+        (
+            {list[str]: (list[str], lambda x: [s.title() for s in x])},
+            DataclassTransform("hi", "bye", ["Die!"]),
+        ),
+    ],
+)
+def test_transform(transform: TransformRules, output: DataclassTransform) -> None:
+    value = {"a": "hi", "b": "bye", "c": ["DIE!"]}
+    data = from_dict(DataclassTransform, value, transform=transform)
+    assert data == output
+    schema = to_json_schema(DataclassTransform, transform=transform)
+    validate(value, schema)
+
+
 # =================
 # UNSUPPORTED TYPES
 # =================
 
 
 @dataclass
-class DataclassUnsupportedSchema:
+class DataclassUnsupportedInSchema:
     a: list
     b: set
     c: Any
 
 
-def test_unsupported_schema_types() -> None:
-    data = from_dict(DataclassUnsupportedSchema, {"a": [1, "?"], "b": {2, "!"}, "c": 1})
-    assert data == DataclassUnsupportedSchema([1, "?"], {2, "!"}, 1)
+def test_unsupported_in_schema_types() -> None:
+    data = from_dict(
+        DataclassUnsupportedInSchema, {"a": [1, "?"], "b": {2, "!"}, "c": 1}
+    )
+    assert data == DataclassUnsupportedInSchema([1, "?"], {2, "!"}, 1)
     assert_invalid_value(
-        DataclassUnsupportedSchema,
+        DataclassUnsupportedInSchema,
         {"a": {1, "?"}, "b": {2, "!"}, "c": 1},
         "value, got",
         valid_schema=False,
     )
     assert_invalid_value(
-        DataclassUnsupportedSchema,
+        DataclassUnsupportedInSchema,
         {"a": [], "b": {}, "c": 1},
         "value, got",
         valid_schema=False,
     )
+
+
+def test_unsupported_in_schema_transform() -> None:
+    transform: TransformRules = {
+        list: (list[int | str], lambda x: x),
+        set: (list[int | str], set),
+        Any: (int, str),  # type:ignore[dict-item]
+    }
+    value = {"a": [1, "?"], "b": [2, "!"], "c": 1}
+    data = from_dict(DataclassUnsupportedInSchema, value, transform=transform)
+    assert data == DataclassUnsupportedInSchema([1, "?"], {2, "!"}, "1")
+    schema = to_json_schema(type(data), transform=transform)
+    validate(value, schema)
+
+
+@dataclass
+class DataclassUnsupportedAnywhere:
+    a: set[int]
+
+
+def test_unsupported_anywhere_types() -> None:
+    with pytest.raises(TypeError):
+        from_dict(DataclassUnsupportedAnywhere, {"a": {1, 2}})
+    with pytest.raises(ValueError):
+        to_json_schema(DataclassUnsupportedAnywhere)
+    transform: TransformRules = {set[int]: (list[int], set)}
+    data = from_dict(DataclassUnsupportedAnywhere, {"a": [1, 2]}, transform=transform)
+    assert data == DataclassUnsupportedAnywhere({1, 2})
+    schema = to_json_schema(DataclassUnsupportedAnywhere, transform=transform)
+    validate({"a": [1, 2]}, schema)

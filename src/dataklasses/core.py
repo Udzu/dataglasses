@@ -6,11 +6,13 @@ from types import NoneType, UnionType
 from typing import (
     Annotated,
     Any,
+    Callable,
     ForwardRef,
     Literal,
     Mapping,
     Optional,
     Sequence,
+    TypeAlias,
     TypeVar,
     Union,
     cast,
@@ -20,9 +22,21 @@ from typing import (
 
 T = TypeVar("T")
 
+TransformRules: TypeAlias = Mapping[type | tuple[type, str], tuple[type, Callable]]
+"""
+Transformation rules, used by both `from_dict` and `to_json_schema`. These map either
+an output type annotation (e.g. `int` or `list[str]`) or a dataclass-and-fieldname tuple
+(e.g. `(InventoryItem, "name")`) to a tuple containing an intermediate type annotation
+and a function to transform values from that type into the output type.
+"""
+
 
 def from_dict(
-    cls: type[T], value: Any, _dataclass: Optional[type] = None, *, strict: bool = False
+    cls: type[T],
+    value: Any,
+    *,
+    strict: bool = False,
+    transform: Optional[TransformRules] = None,
 ) -> T:
     """
     Convert a dict, such as one generated using dataclasses.asdict(), to a dataclass.
@@ -32,110 +46,142 @@ def from_dict(
 
     :param cls: Type to convert to.
     :param value: Value to convert.
-    :param _dataclass: Surrounding dataclass (used for ForwardRef evaluation in recursive calls).
     :param strict: Disallow additional dataclass properties.
+    :param transform: Transformation rules.
     :return: Converted value.
     :raises TypeError: When the value doesn't match the type.
     """
+    if transform is None:
+        transform = {}
 
-    if cls is None:
-        cls = NoneType
+    def _from_dict(
+        cls: type[T],
+        value: Any,
+        datacls: Optional[type] = None,
+        transformed: bool = False,
+    ) -> T:
+        if cls in transform and not transformed:
+            input_type, fn = transform[cls]
+            return fn(_from_dict(input_type, value, datacls, transformed=True))
 
-    elif cls is Any:
-        cls = object  # type: ignore[assignment]
+        if cls is None:
+            cls = NoneType
 
-    if dataclasses.is_dataclass(cls) and not isinstance(value, cls):
-        if not isinstance(value, Mapping):
-            raise TypeError(f"Expected mapping corresponding to {cls}, got {value}")
-        field_types = {f.name: cast(type, f.type) for f in dataclasses.fields(cls)}
-        if strict and any(f not in field_types for f in value):
-            raise TypeError(f"Unexpected {cls} fields {set(value) - set(field_types)}")
-        return cls(
-            **{
-                f: from_dict(field_types[f], v, cls)
-                for f, v in value.items()
-                if f in field_types
-            }
-        )  # type: ignore[return-value]
+        elif cls is Any:
+            cls = object  # type: ignore[assignment]
 
-    elif isinstance(cls, (str, ForwardRef)):
-        ref = ForwardRef(cls) if isinstance(cls, str) else cls
-        _globals = vars(inspect.getmodule(_dataclass))
-        _locals = _dataclass.__dict__
-        return from_dict(
-            ref._evaluate(_globals, _locals, frozenset()), value, _dataclass
-        )
+        if dataclasses.is_dataclass(cls) and not isinstance(value, cls):
+            if not isinstance(value, Mapping):
+                raise TypeError(
+                    f"Expected mapping corresponding to {cls}, got {value!r}"
+                )
+            field_types = {f.name: cast(type, f.type) for f in dataclasses.fields(cls)}
+            if strict and any(f not in field_types for f in value):
+                raise TypeError(
+                    f"Unexpected {cls} fields {set(value) - set(field_types)}"
+                )
+            init_args = {}
+            for f, v in value.items():
+                if f in field_types:
+                    if (cls, f) in transform:
+                        input_type, fn = transform[(cls, f)]
+                        init_args[f] = fn(_from_dict(input_type, v, cls))
+                    else:
+                        init_args[f] = _from_dict(field_types[f], v, cls)
+            return cls(**init_args)  # type: ignore[return-value]
 
-    origin = get_origin(cls)
-
-    if origin in (collections.abc.Sequence, list):
-        if not isinstance(value, Sequence):
-            raise TypeError(f"Expected sequence corresponding to {cls}, got {value}")
-        sequence_type = get_args(cls)[0]
-        return [from_dict(sequence_type, v, _dataclass) for v in value]  # type: ignore[return-value]
-
-    elif origin in (collections.abc.Mapping, dict):
-        if not isinstance(value, Mapping):
-            raise TypeError(f"Expected mapping corresponding to {cls}, got {value}")
-        key_type, value_type = get_args(cls)
-        return {
-            from_dict(key_type, k, _dataclass): from_dict(value_type, v, _dataclass)
-            for k, v in value.items()
-        }  # type: ignore[return-value]
-
-    elif origin is tuple:
-        tuple_types = get_args(cls)
-        if not isinstance(value, Sequence):
-            raise TypeError(f"Expected sequence corresponding to {cls}, got {value}")
-        if len(tuple_types) == 2 and tuple_types[1] == Ellipsis:
-            tuple_types = (tuple_types[0],) * len(value)
-        if len(value) != len(tuple_types):
-            raise TypeError(
-                f"Expected {len(tuple_types)} elements for {cls}, got {value}"
+        elif isinstance(cls, (str, ForwardRef)):
+            ref = ForwardRef(cls) if isinstance(cls, str) else cls
+            _globals = vars(inspect.getmodule(datacls))
+            _locals = datacls.__dict__
+            return _from_dict(
+                ref._evaluate(_globals, _locals, frozenset()), value, datacls
             )
-        return tuple(
-            from_dict(tuple_type, v, _dataclass)
-            for tuple_type, v in zip(tuple_types, value)
-        )  # type: ignore[return-value]
 
-    elif origin in (Union, UnionType):
-        union_types = get_args(cls)
-        for union_type in union_types:
-            try:
-                return from_dict(union_type, value, _dataclass)
-            except Exception:
-                continue
-        raise TypeError(
-            f"Expected value corresponding to one of {union_types}, got {value}"
-        )
+        origin = get_origin(cls)
 
-    elif origin == Literal:
-        if value not in get_args(cls):
-            raise TypeError(f"Expected one of {get_args(cls)}, got {value}")
+        if origin in (collections.abc.Sequence, list):
+            if not isinstance(value, Sequence):
+                raise TypeError(
+                    f"Expected sequence corresponding to {cls}, got {value!r}"
+                )
+            sequence_type = get_args(cls)[0]
+            return [_from_dict(sequence_type, v, datacls) for v in value]  # type: ignore[return-value]
+
+        elif origin in (collections.abc.Mapping, dict):
+            if not isinstance(value, Mapping):
+                raise TypeError(
+                    f"Expected mapping corresponding to {cls}, got {value!r}"
+                )
+            key_type, value_type = get_args(cls)
+            return {
+                _from_dict(key_type, k, datacls): _from_dict(value_type, v, datacls)
+                for k, v in value.items()
+            }  # type: ignore[return-value]
+
+        elif origin is tuple:
+            tuple_types = get_args(cls)
+            if not isinstance(value, Sequence):
+                raise TypeError(
+                    f"Expected sequence corresponding to {cls}, got {value!r}"
+                )
+            if len(tuple_types) == 2 and tuple_types[1] == Ellipsis:
+                tuple_types = (tuple_types[0],) * len(value)
+            if len(value) != len(tuple_types):
+                raise TypeError(
+                    f"Expected {len(tuple_types)} elements for {cls}, got {value!r}"
+                )
+            return tuple(
+                _from_dict(tuple_type, v, datacls)
+                for tuple_type, v in zip(tuple_types, value)
+            )  # type: ignore[return-value]
+
+        elif origin in (Union, UnionType):
+            union_types = get_args(cls)
+            for union_type in union_types:
+                try:
+                    return _from_dict(union_type, value, datacls)
+                except Exception:
+                    continue
+            raise TypeError(
+                f"Expected value corresponding to one of {union_types}, got {value!r}"
+            )
+
+        elif origin == Literal:
+            if value not in get_args(cls):
+                raise TypeError(f"Expected one of {get_args(cls)}, got {value!r}")
+            return value
+
+        elif origin == Annotated:
+            return _from_dict(get_args(cls)[0], value, datacls)
+
+        elif (
+            isinstance(cls, type)
+            and issubclass(cls, Enum)
+            and not isinstance(value, cls)
+        ):
+            if any(e.value == value for e in cls):
+                return cls(value)  # type: ignore[return-value]
+            elif value in cls.__members__:
+                return cls[value]  # type: ignore[return-value]
+            else:
+                raise TypeError(f"Expected {cls} label, got {value!r}")
+
+        elif cls is float and isinstance(value, int):
+            # see https://peps.python.org/pep-0484/#the-numeric-tower
+            return value  # type: ignore[return-value]
+
+        elif not isinstance(value, cls):
+            raise TypeError(f"Expected {cls} value, got {value!r}")
+
         return value
 
-    elif origin == Annotated:
-        return from_dict(get_args(cls)[0], value, _dataclass)
-
-    elif isinstance(cls, type) and issubclass(cls, Enum) and not isinstance(value, cls):
-        if any(e.value == value for e in cls):
-            return cls(value)  # type: ignore[return-value]
-        elif value in cls.__members__:
-            return cls[value]  # type: ignore[return-value]
-        else:
-            raise TypeError(f"Expected {cls} label, got {value}")
-
-    elif cls is float and isinstance(value, int):
-        # see https://peps.python.org/pep-0484/#the-numeric-tower
-        return value  # type: ignore[return-value]
-
-    elif not isinstance(value, cls):
-        raise TypeError(f"Expected {cls} value, got {value}")
-
-    return value
+    return _from_dict(cls, value)
 
 
-def to_json_schema(cls: type, *, strict: bool = False) -> dict[str, Any]:
+def to_json_schema(
+    cls: type, *, strict: bool = False, transform: Optional[TransformRules] = None
+) -> dict[str, Any]:
     """
     Convert a dataclass (or other Python class) into a JSON schema. Data that satisfies
     the schema can be converted into the class using `from_dict`.
@@ -146,13 +192,18 @@ def to_json_schema(cls: type, *, strict: bool = False) -> dict[str, Any]:
 
     :param cls: Class to generate a schema for.
     :param strict: Disallow additional dataclass properties.
+    :param transform: Transformation rules.
     :return: JSON schema dict.
     :raises ValueError: When the class cannot be represented in JSON.
     """
 
     defs: dict[str, Any] = {}
+    if transform is None:
+        transform = {}
 
-    def _json_schema(cls: type, _dataclass: Optional[type] = None) -> dict[str, Any]:
+    def _json_schema(
+        cls: type, datacls: Optional[type] = None, transformed: bool = False
+    ) -> dict[str, Any]:
         basic_types = {
             bool: "boolean",
             int: "integer",
@@ -160,6 +211,10 @@ def to_json_schema(cls: type, *, strict: bool = False) -> dict[str, Any]:
             str: "string",
             NoneType: "null",
         }
+
+        if cls in transform and not transformed:
+            input_type, _ = transform[cls]
+            return _json_schema(input_type, datacls, transformed=True)
 
         if cls is None:
             cls = NoneType
@@ -170,11 +225,17 @@ def to_json_schema(cls: type, *, strict: bool = False) -> dict[str, Any]:
         elif dataclasses.is_dataclass(cls):
             if cls.__qualname__ not in defs:
                 # (make sure to create definition before the recursive call)
-                defn = defs[cls.__qualname__] = {"type": "object"}
-                defn["properties"] = {
-                    f.name: _json_schema(cast(type, f.type), cls)
-                    for f in dataclasses.fields(cls)
-                }
+                defn = defs[cls.__qualname__] = {"type": "object", "properties": {}}
+
+                for f in dataclasses.fields(cls):
+                    if (cls, f.name) in transform:
+                        input_type, _ = transform[(cls, f.name)]
+                        defn["properties"][f.name] = _json_schema(input_type, cls)
+                    else:
+                        defn["properties"][f.name] = _json_schema(
+                            cast(type, f.type), cls
+                        )
+
                 defn["required"] = [
                     f.name
                     for f in dataclasses.fields(cls)
@@ -191,16 +252,16 @@ def to_json_schema(cls: type, *, strict: bool = False) -> dict[str, Any]:
 
         if isinstance(cls, (str, ForwardRef)):
             ref = ForwardRef(cls) if isinstance(cls, str) else cls
-            _globals = vars(inspect.getmodule(_dataclass))
-            _locals = _dataclass.__dict__
+            _globals = vars(inspect.getmodule(datacls))
+            _locals = datacls.__dict__
             evaluated_type = cast(type, ref._evaluate(_globals, _locals, frozenset()))
-            return _json_schema(evaluated_type, _dataclass)
+            return _json_schema(evaluated_type, datacls)
 
         origin = get_origin(cls)
 
         if origin in (collections.abc.Sequence, list):
             sequence_type = get_args(cls)[0]
-            return {"type": "array", "items": _json_schema(sequence_type, _dataclass)}
+            return {"type": "array", "items": _json_schema(sequence_type, datacls)}
 
         elif origin in (collections.abc.Mapping, dict):
             key_type, value_type = get_args(cls)
@@ -208,24 +269,24 @@ def to_json_schema(cls: type, *, strict: bool = False) -> dict[str, Any]:
                 raise ValueError(f"Unsupported non-string mapping key type: {key_type}")
             return {
                 "type": "object",
-                "patternProperties": {"^.*$": _json_schema(value_type, _dataclass)},
+                "patternProperties": {"^.*$": _json_schema(value_type, datacls)},
             }
 
         elif origin in (Union, UnionType):
             union_types = get_args(cls)
-            return {"anyOf": [_json_schema(t, _dataclass) for t in union_types]}
+            return {"anyOf": [_json_schema(t, datacls) for t in union_types]}
 
         elif origin is tuple:
             tuple_types = get_args(cls)
             if len(tuple_types) == 2 and tuple_types[1] == Ellipsis:
                 return {
                     "type": "array",
-                    "items": _json_schema(tuple_types[0], _dataclass),
+                    "items": _json_schema(tuple_types[0], datacls),
                 }
             else:
                 return {
                     "type": "array",
-                    "prefixItems": [_json_schema(t, _dataclass) for t in tuple_types],
+                    "prefixItems": [_json_schema(t, datacls) for t in tuple_types],
                     "minItems": len(tuple_types),
                     "maxItems": len(tuple_types),
                 }
@@ -235,7 +296,7 @@ def to_json_schema(cls: type, *, strict: bool = False) -> dict[str, Any]:
 
         elif origin == Annotated:
             annotated_type, description = get_args(cls)
-            defn = _json_schema(annotated_type, _dataclass)
+            defn = _json_schema(annotated_type, datacls)
             defn["description"] = description
             return defn
 

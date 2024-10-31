@@ -65,21 +65,27 @@ InventoryItem(name='widget', unit_price=3.0, quantity_on_hand=0)
 
 ## Purpose
 
-[TODO]
-
 ## Usage
 
 The package contains just two functions:
 
 ```python
-def from_dict(cls: type[T], value: Any, *, strict: bool = False) -> T
+def from_dict(
+    cls: type[T],
+    value: Any,
+    *,
+    strict: bool = False,
+    transform: Optional[TransformRules] = None,
+) -> T
 ````
-This converts a nested dictionary `value` of input data into the given dataclass type `cls`, raising a `TypeError` if the conversion is not possible.
+This converts a nested dictionary `value` of input data into the given dataclass type `cls`, raising a `TypeError` if the conversion is not possible. (The optional keyword arguments are described below.)
 
 ```python
-def to_json_schema(cls: type, *, strict: bool = False) -> dict[str, Any]:
+def to_json_schema(
+    cls: type, *, strict: bool = False, transform: Optional[TransformRules] = None
+) -> dict[str, Any]:
 ```
-This generates a JSON schema representing valid inputs for the dataclass type `cls`, raising a `ValueError` if the class cannot be represented in JSON.
+This generates a JSON schema representing valid inputs for the dataclass type `cls`, raising a `ValueError` if the class cannot be represented in JSON.  (Again, the optional keyword arguments are described below.)
 
 Below is a summary of the different supported use cases.
 
@@ -176,7 +182,7 @@ location=TrackedItem.GPS(lat=52.2, long=0.1))
 
 ### Enum and Literal types
 
-Both `Enum` and `Literal` types match explicit enumerations. `Enum` types match both the values and symbolic names (preferring the former in case of a clash).
+Both `Enum` and `Literal` types can be used to match explicit enumerations. `Enum` types match both the values and symbolic names (preferring the former in case of a clash).
 
 ```python
 >>> from enum import auto, StrEnum
@@ -393,3 +399,6 @@ TypeError: Unexpected <class '__main__.InventoryItem'> fields {'comment'}
 }
 ```
 </details>
+
+### Transformations
+

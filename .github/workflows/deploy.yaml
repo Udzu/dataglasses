@@ -1,6 +1,7 @@
 name: Release Deployment
 
 on:
+  workflow_dispatch:
   push:
     tags: v[0-9]+.[0-9]+.[0-9]+*
 
@@ -18,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v3
         with:
-          python-version: 3.10
+          python-version: '3.10'
       - name: Install uv
         uses: astral-sh/setup-uv@v3
       - name: Build package

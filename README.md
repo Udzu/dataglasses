@@ -681,4 +681,4 @@ Person(name='Robert!', aliases={'Bobby', 'Bob'})
 
 ## Contributions
 
-Bug reports, feature requests and contributions are very welcome. Note that PRs must include tests and pass the quality checks [defined here](.github/workflows/quality_checks.yaml). More development details will be added shortly, once the project has stabilised...
+Bug reports, feature requests and contributions are very welcome. Note that PRs must include tests and pass the quality checks [defined here](.github/workflows/quality_checks.yaml). More development details will be added shortly, once the project has stabilised.

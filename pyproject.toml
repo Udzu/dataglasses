@@ -1,12 +1,12 @@
 [project]
 name = "dataglasses"
-version = "0.5.1"
+version = "0.5.2"
 description = "Simple creation of dataclasses from JSON"
 readme = "README.md"
 authors = [
     { name = "Uri Granta", email = "uri.granta+python@gmail.com" }
 ]
-requires-python = ">=3.10.15"
+requires-python = ">=3.10"
 dependencies = []
 license = {text = "MIT"}
 keywords = ["dataclasses", "json", "json schema"]

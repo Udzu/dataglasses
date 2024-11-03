@@ -1,5 +1,5 @@
 version = 1
-requires-python = ">=3.10.15"
+requires-python = ">=3.10"
 
 [[package]]
 name = "attrs"
@@ -85,7 +85,7 @@ toml = [
 
 [[package]]
 name = "dataglasses"
-version = "0.5.1"
+version = "0.5.2"
 source = { editable = "." }
 
 [package.dependency-groups]

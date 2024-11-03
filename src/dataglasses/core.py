@@ -37,6 +37,7 @@ def from_dict(
     *,
     strict: bool = False,
     transform: Optional[TransformRules] = None,
+    local_refs: Optional[set[type]] = None,
 ) -> T:
     """
     Convert a dict, such as one generated using dataclasses.asdict(), to a dataclass.
@@ -49,6 +50,7 @@ def from_dict(
     :param value: Value to convert.
     :param strict: Disallow additional dataclass properties.
     :param transform: Transformation rules.
+    :param local_refs: Locally scoped types used in forward references.
     :return: Converted value.
     :raises TypeError: When the value doesn't match the type.
     """
@@ -95,6 +97,8 @@ def from_dict(
             ref = ForwardRef(cls) if isinstance(cls, str) else cls
             _globals = vars(inspect.getmodule(datacls))
             _locals = datacls.__dict__
+            if local_refs is not None:
+                _locals = _locals | {c.__name__: c for c in local_refs}
             return _from_dict(
                 ref._evaluate(_globals, _locals, frozenset()),
                 value,
@@ -187,6 +191,7 @@ def to_json_schema(
     *,
     strict: bool = False,
     transform: Optional[TransformRules] = None,
+    local_refs: Optional[set[type]] = None,
 ) -> dict[str, Any]:
     """
     Convert a dataclass (or other Python class) into a JSON schema. Data that satisfies
@@ -200,10 +205,10 @@ def to_json_schema(
     :param cls: Class to generate a schema for.
     :param strict: Disallow additional dataclass properties.
     :param transform: Transformation rules.
+    :param local_refs: Locally scoped types used in forward references.
     :return: JSON schema dict.
     :raises ValueError: When the class cannot be represented in JSON.
     """
-
     defs: dict[str, Any] = {}
     if transform is None:
         transform = {}
@@ -264,6 +269,8 @@ def to_json_schema(
             ref = ForwardRef(cls) if isinstance(cls, str) else cls
             _globals = vars(inspect.getmodule(datacls))
             _locals = datacls.__dict__
+            if local_refs is not None:
+                _locals = _locals | {c.__name__: c for c in local_refs}
             evaluated_type = cast(type, ref._evaluate(_globals, _locals, frozenset()))
             return _json_schema(evaluated_type, datacls)
 

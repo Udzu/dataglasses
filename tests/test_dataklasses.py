@@ -22,13 +22,13 @@ from dataglasses import TransformRules, from_dict, to_json_schema
 from tests.forward_dataclass import DataclassForward, DataclassGlobal
 
 
-def assert_asdict_inverse(data: Any) -> None:
+def assert_asdict_inverse(data: Any, local_refs: Optional[set[type]] = None) -> None:
     """Checks that the `asdict` output on `data`, saved and loaded as json,
     validates against the JSON schema and is inverted by `from_dict`."""
     value = json.loads(json.dumps(asdict(data)))
-    schema = to_json_schema(type(data))
+    schema = to_json_schema(type(data), local_refs=local_refs)
     validate(value, schema)
-    data_loop = from_dict(type(data), value)
+    data_loop = from_dict(type(data), value, local_refs=local_refs)
     assert data == data_loop
 
 
@@ -393,6 +393,18 @@ def test_annotated_descriptions() -> None:
 )
 def test_forward_references(data: Any) -> None:
     assert_asdict_inverse(data)
+
+
+def test_local_forward_references() -> None:
+    @dataclass
+    class LocalFwd:
+        a: "Optional[LocalFwd]"
+
+    with pytest.raises(NameError):
+        assert_asdict_inverse(LocalFwd(None))
+
+    assert_asdict_inverse(LocalFwd(None), local_refs={LocalFwd})
+    assert_asdict_inverse(LocalFwd(LocalFwd(None)), local_refs={LocalFwd})
 
 
 # ==========

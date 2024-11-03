@@ -88,6 +88,7 @@ def from_dict(
     *,
     strict: bool = False,
     transform: Optional[TransformRules] = None,
+    local_refs: Optional[set[type]] = None,
 ) -> T
 ````
 This converts a nested dictionary `value` of input data into the given dataclass type `cls`, raising an exception if the conversion is not possible. (The optional keyword arguments are described further down.)
@@ -98,6 +99,7 @@ def to_json_schema(
     *,
     strict: bool = False,
     transform: Optional[TransformRules] = None,
+    local_refs: Optional[set[type]] = None,
 ) -> dict[str, Any]:
 ```
 This generates a JSON schema representing valid inputs for the dataclass type `cls`, raising an exception if the class cannot be represented in JSON.  (Again, the optional keyword arguments are described further down.)
@@ -110,7 +112,7 @@ Dataclasses can be nested, using either global or local definitions.
 
 ```python
 >>> @dataclass
-... clss TrackedItem:
+... class TrackedItem:
 ... 
 ...     @dataclass
 ...     class GPS:
@@ -518,23 +520,23 @@ InventoryItem(name='widget', unit_price=3.0, quantity_on_hand=0)
 
 ### Forward references
 
-Forward reference types (written as string literals or `ForwardRef` objects) are handled automatically, permitting recursive dataclasses. Both global and local references are supported.
+Forward reference types (written as string literals or `ForwardRef` objects) are supported, permitting recursive dataclasses. Global and class-scoped references are handled automatically:
 
 ```python
 >>> @dataclass
 ... class Cons:
-...     head: int
+...     head: "Head"
 ...     tail: Optional["Cons"] = None
 ...     
+...     @dataclass
+...     class Head:
+...         v: int
+...         
 ...     def __repr__(self):
-...         current, rep = self, []
-...         while isinstance(current, Cons):
-...             rep.append(str(current.head))
-...             current = current.tail
-...         return "(" + ",".join(rep) + ")"
+...         return f"{self.head.v}::{self.tail}"
 
->>> from_dict(Cons, { "head": 1, "tail": { "head": 2 } })
-(1,2)
+>>> from_dict(Cons, {"head": {"v": 1}, "tail": {"head": {"v": 2}}})
+1::2::None
 
 >> print(dumps(to_json_schema(Cons), indent=2))
 ```
@@ -551,7 +553,7 @@ Forward reference types (written as string literals or `ForwardRef` objects) are
       "type": "object",
       "properties": {
         "head": {
-          "type": "integer"
+          "$ref": "#/$defs/Cons.Head"
         },
         "tail": {
           "anyOf": [
@@ -568,11 +570,44 @@ Forward reference types (written as string literals or `ForwardRef` objects) are
       "required": [
         "head"
       ]
+    },
+    "Cons.Head": {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "v"
+      ]
     }
   }
 }
 ```
 </details>
+
+Locally-scoped references, meanwhile, must be passed in using the `local_refs` arguments:
+
+```python
+>>> def reverse_cons(seq):
+... 
+...     @dataclass
+...     class Cons:
+...         head: int
+...         tail: Optional["Cons"] = None
+... 
+...         def __repr__(self):
+...             return f"{self.head}::{self.tail}"
+... 
+...     value = None
+...     for x in seq:
+...         value = { "head": x, "tail": value }
+...     return from_dict(Cons, value, local_refs={Cons})
+
+>>> reverse_cons([1,2,3])
+3::2::1::None
+```
 
 ### Strict mode
 

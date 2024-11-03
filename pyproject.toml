@@ -1,6 +1,6 @@
 [project]
 name = "dataglasses"
-version = "0.5.2"
+version = "0.6.0"
 description = "Simple creation of dataclasses from JSON"
 readme = "README.md"
 authors = [

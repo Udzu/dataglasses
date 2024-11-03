@@ -1,6 +1,6 @@
 [project]
 name = "dataglasses"
-version = "0.5.0"
+version = "0.5.1"
 description = "Simple creation of dataclasses from JSON"
 readme = "README.md"
 authors = [
@@ -8,6 +8,21 @@ authors = [
 ]
 requires-python = ">=3.10.15"
 dependencies = []
+license = {text = "MIT"}
+keywords = ["dataclasses", "json", "json schema"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: File Formats :: JSON",
+  "Topic :: File Formats :: JSON :: JSON Schema",
+]
 
 [build-system]
 requires = ["hatchling"]

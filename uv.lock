@@ -85,7 +85,7 @@ toml = [
 
 [[package]]
 name = "dataglasses"
-version = "0.5.0"
+version = "0.5.1"
 source = { editable = "." }
 
 [package.dependency-groups]

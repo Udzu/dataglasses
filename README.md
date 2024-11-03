@@ -1,24 +1,24 @@
-# dataklasses
+# dataglasses
 
 A small package to simplify creating dataclasses from JSON and validating that JSON.
 
 ## Installation
 
 ```
-$ pip install dataklasses
+$ pip install dataglasses
 ```
 
 ## Requirements
 
 Requires Python 3.10 or later.
 
-If you wish to validate arbitrary JSON data against the generated JSON schemas in Python, consider installing [jsonschema](https://github.com/python-jsonschema/jsonschema), though this is unnecessary when using `dataklasses` to convert JSON into dataclasses.
+If you wish to validate arbitrary JSON data against the generated JSON schemas in Python, consider installing [jsonschema](https://github.com/python-jsonschema/jsonschema), though this is unnecessary when using `dataglasses` to convert JSON into dataclasses.
 
 ## Quick start
 
 ```python
 >>> from dataclasses import dataclass
->>> from dataklasses import from_dict, to_json_schema
+>>> from dataglasses import from_dict, to_json_schema
 >>> from json import dumps
 
 >>> @dataclass

@@ -18,7 +18,7 @@ import pytest
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
-from dataklasses import TransformRules, from_dict, to_json_schema
+from dataglasses import TransformRules, from_dict, to_json_schema
 from tests.forward_dataclass import DataclassForward, DataclassGlobal
 
 

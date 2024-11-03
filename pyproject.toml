@@ -1,5 +1,5 @@
 [project]
-name = "dataklasses"
+name = "dataglasses"
 version = "0.1.0"
 description = "Simple creation of dataclasses from JSON"
 readme = "README.md"

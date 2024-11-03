@@ -1,5 +1,4 @@
 import json
-import re
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
 from types import MappingProxyType
@@ -24,7 +23,8 @@ from tests.forward_dataclass import DataclassForward, DataclassGlobal
 
 
 def assert_asdict_inverse(data: Any) -> None:
-    """Checks asdict output validates against the JSON schema and is inverted by from_dict."""
+    """Checks that the `asdict` output on `data`, saved and loaded as json,
+    validates against the JSON schema and is inverted by `from_dict`."""
     value = json.loads(json.dumps(asdict(data)))
     schema = to_json_schema(type(data))
     validate(value, schema)
@@ -45,11 +45,10 @@ def assert_invalid_value(
         with pytest.raises(ValidationError):
             validate(value, schema)
     else:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Unsupported"):
             to_json_schema(cls, strict=strict)
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError, match=error):
         from_dict(cls, value, strict=strict)
-    assert re.search(error, str(e.value)), f"{e.value} doesn't match {error}"
 
 
 # ===========
@@ -99,7 +98,7 @@ def test_defaults():
 
 
 @pytest.mark.parametrize(
-    "value, error",
+    ("value", "error"),
     [
         pytest.param(None, "mapping", id="Bad input type"),
         pytest.param({"f": 0.5, "s": "a"}, "required", id="Missing field"),
@@ -138,7 +137,8 @@ class DataclassSequence:
     [
         DataclassSequence([], []),
         DataclassSequence(
-            [1, 2, 3], [DataclassElement(1, "a"), DataclassElement(2, "b")]
+            [1, 2, 3],
+            [DataclassElement(1, "a"), DataclassElement(2, "b")],
         ),
     ],
 )
@@ -152,7 +152,7 @@ def test_sequence_defaults_to_list() -> None:
 
 
 @pytest.mark.parametrize(
-    "value, error",
+    ("value", "error"),
     [
         pytest.param({"s": 1, "L": []}, "sequence", id="Bad sequence"),
         pytest.param({"s": [1, 1.5], "L": []}, "value, got", id="Bad sequence element"),
@@ -190,7 +190,7 @@ def test_union_types(data: Any) -> None:
 
 
 @pytest.mark.parametrize(
-    "value, error",
+    ("value", "error"),
     [
         pytest.param({"o": "hi", "u": "ho", "b": []}, "one of", id="Bad optional"),
         pytest.param({"o": 1, "u": 1, "b": []}, "one of", id="Bad union"),
@@ -225,12 +225,14 @@ def test_tuple_types(data: Any) -> None:
 
 
 @pytest.mark.parametrize(
-    "value, error",
+    ("value", "error"),
     [
         pytest.param({"t": [1, "a"], "e": 1.5}, "sequence", id="Bad tuple type"),
         pytest.param({"t": [1, 2], "e": []}, "value, got", id="Bad tuple field type"),
         pytest.param(
-            {"t": [1, "a", 1], "e": []}, "2 elements", id="Bad tuple length big"
+            {"t": [1, "a", 1], "e": []},
+            "2 elements",
+            id="Bad tuple length big",
         ),
         pytest.param({"t": [1], "e": []}, "2 elements", id="Bad tuple length small"),
     ],
@@ -267,12 +269,14 @@ def test_mapping_defaults_to_dict() -> None:
 
 
 @pytest.mark.parametrize(
-    "value, error",
+    ("value", "error"),
     [
         pytest.param({"m": None, "d": {}}, "mapping", id="Bad mapping type"),
         pytest.param({"m": {"a": "1"}, "d": {}}, "value, got", id="Bad mapping value"),
         pytest.param(
-            {"m": {}, "d": {"a": 1}}, "corresponding", id="Bad mapping value 2"
+            {"m": {}, "d": {"a": 1}},
+            "corresponding",
+            id="Bad mapping value 2",
         ),
     ],
 )
@@ -324,7 +328,7 @@ def test_enum_from_name() -> None:
 
 
 @pytest.mark.parametrize(
-    "value, error",
+    ("value", "error"),
     [
         pytest.param({"L": "BLACK", "s": "red", "i": 1}, "one of", id="Bad literal"),
         pytest.param({"L": "black", "s": "black", "i": 1}, "label", id="Bad str enum"),
@@ -369,7 +373,7 @@ def test_annotated_descriptions() -> None:
 # FORWARD REFERENCES
 # ==================
 
-# the dataclass are imported from a different module, to ensure the correct globals are used
+# NB dataclass imported from a different module, to ensure the correct globals are used
 
 
 @pytest.mark.parametrize(
@@ -379,8 +383,9 @@ def test_annotated_descriptions() -> None:
         DataclassForward(
             DataclassForward.DataclassLocal(
                 DataclassForward(
-                    DataclassForward.DataclassLocal(None), DataclassGlobal(1)
-                )
+                    DataclassForward.DataclassLocal(None),
+                    DataclassGlobal(1),
+                ),
             ),
             DataclassGlobal(2),
         ),
@@ -404,7 +409,7 @@ class DataclassTransform:
 
 
 @pytest.mark.parametrize(
-    "transform,output",
+    ("transform", "output"),
     [
         ({str: (str, str.title)}, DataclassTransform("Hi", "Bye", ["Die!"])),
         (
@@ -482,9 +487,9 @@ class DataclassUnsupportedAnywhere:
 
 
 def test_unsupported_anywhere_types() -> None:
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="isinstance"):
         from_dict(DataclassUnsupportedAnywhere, {"a": {1, 2}})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unsupported"):
         to_json_schema(DataclassUnsupportedAnywhere)
     transform: TransformRules = {set[int]: (list[int], set)}
     data = from_dict(DataclassUnsupportedAnywhere, {"a": [1, 2]}, transform=transform)

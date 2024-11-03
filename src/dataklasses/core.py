@@ -41,8 +41,9 @@ def from_dict(
     """
     Convert a dict, such as one generated using dataclasses.asdict(), to a dataclass.
 
-    Supports dataclass fields with basic types, as well as nested and recursive dataclasses, and
-    Sequence, List, Tuple, Mapping, Dict, Optional, Union, Literal, Enum and Annotated types.
+    Supports dataclass fields with basic types, as well as nested and recursive
+    dataclasses, and Sequence, List, Tuple, Mapping, Dict, Optional, Union, Literal,
+    Enum and Annotated types.
 
     :param cls: Type to convert to.
     :param value: Value to convert.
@@ -73,12 +74,12 @@ def from_dict(
         if dataclasses.is_dataclass(cls) and not isinstance(value, cls):
             if not isinstance(value, Mapping):
                 raise TypeError(
-                    f"Expected mapping corresponding to {cls}, got {value!r}"
+                    f"Expected mapping corresponding to {cls}, got {value!r}",
                 )
             field_types = {f.name: cast(type, f.type) for f in dataclasses.fields(cls)}
             if strict and any(f not in field_types for f in value):
                 raise TypeError(
-                    f"Unexpected {cls} fields {set(value) - set(field_types)}"
+                    f"Unexpected {cls} fields {set(value) - set(field_types)}",
                 )
             init_args = {}
             for f, v in value.items():
@@ -95,7 +96,9 @@ def from_dict(
             _globals = vars(inspect.getmodule(datacls))
             _locals = datacls.__dict__
             return _from_dict(
-                ref._evaluate(_globals, _locals, frozenset()), value, datacls
+                ref._evaluate(_globals, _locals, frozenset()),
+                value,
+                datacls,
             )
 
         origin = get_origin(cls)
@@ -103,7 +106,7 @@ def from_dict(
         if origin in (collections.abc.Sequence, list):
             if not isinstance(value, Sequence):
                 raise TypeError(
-                    f"Expected sequence corresponding to {cls}, got {value!r}"
+                    f"Expected sequence corresponding to {cls}, got {value!r}",
                 )
             sequence_type = get_args(cls)[0]
             return [_from_dict(sequence_type, v, datacls) for v in value]  # type: ignore[return-value]
@@ -111,7 +114,7 @@ def from_dict(
         elif origin in (collections.abc.Mapping, dict):
             if not isinstance(value, Mapping):
                 raise TypeError(
-                    f"Expected mapping corresponding to {cls}, got {value!r}"
+                    f"Expected mapping corresponding to {cls}, got {value!r}",
                 )
             key_type, value_type = get_args(cls)
             return {
@@ -123,17 +126,17 @@ def from_dict(
             tuple_types = get_args(cls)
             if not isinstance(value, Sequence):
                 raise TypeError(
-                    f"Expected sequence corresponding to {cls}, got {value!r}"
+                    f"Expected sequence corresponding to {cls}, got {value!r}",
                 )
             if len(tuple_types) == 2 and tuple_types[1] == Ellipsis:
                 tuple_types = (tuple_types[0],) * len(value)
             if len(value) != len(tuple_types):
                 raise TypeError(
-                    f"Expected {len(tuple_types)} elements for {cls}, got {value!r}"
+                    f"Expected {len(tuple_types)} elements for {cls}, got {value!r}",
                 )
             return tuple(
                 _from_dict(tuple_type, v, datacls)
-                for tuple_type, v in zip(tuple_types, value)
+                for tuple_type, v in zip(tuple_types, value, strict=True)
             )  # type: ignore[return-value]
 
         elif origin in (Union, UnionType):
@@ -144,7 +147,7 @@ def from_dict(
                 except Exception:
                     continue
             raise TypeError(
-                f"Expected value corresponding to one of {union_types}, got {value!r}"
+                f"Expected value corresponding to one of {union_types}, got {value!r}",
             )
 
         elif origin == Literal:
@@ -180,15 +183,19 @@ def from_dict(
 
 
 def to_json_schema(
-    cls: type, *, strict: bool = False, transform: Optional[TransformRules] = None
+    cls: type,
+    *,
+    strict: bool = False,
+    transform: Optional[TransformRules] = None,
 ) -> dict[str, Any]:
     """
     Convert a dataclass (or other Python class) into a JSON schema. Data that satisfies
     the schema can be converted into the class using `from_dict`.
 
-    Supports dataclass fields with basic types, as well as nested and recursive dataclasses, and
-    Sequence, List, Tuple, Mapping, Dict, Optional, Union, Literal, Enum and Annotated types.
-    Annotated types are used to populate property descriptions.
+    Supports dataclass fields with basic types, as well as nested and recursive
+    dataclasses, and Sequence, List, Tuple, Mapping, Dict, Optional, Union, Literal,
+    Enum and Annotated types. Annotated types are used to populate property
+    descriptions.
 
     :param cls: Class to generate a schema for.
     :param strict: Disallow additional dataclass properties.
@@ -202,7 +209,9 @@ def to_json_schema(
         transform = {}
 
     def _json_schema(
-        cls: type, datacls: Optional[type] = None, transformed: bool = False
+        cls: type,
+        datacls: Optional[type] = None,
+        transformed: bool = False,
     ) -> dict[str, Any]:
         basic_types = {
             bool: "boolean",
@@ -233,7 +242,8 @@ def to_json_schema(
                         defn["properties"][f.name] = _json_schema(input_type, cls)
                     else:
                         defn["properties"][f.name] = _json_schema(
-                            cast(type, f.type), cls
+                            cast(type, f.type),
+                            cls,
                         )
 
                 defn["required"] = [

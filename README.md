@@ -1,8 +1,8 @@
 # dataglasses
 
-[![License](https://img.shields.io/pypi/l/dataglasses.svg)](LICENSE)
-[![PyPi](https://img.shields.io/pypi/v/dataglasses.svg)](https://pypi.python.org/pypi/dataglasses)
-[![Python](https://img.shields.io/pypi/pyversions/dataglasses.svg)](https://pypi.python.org/pypi/dataglasses)
+[![PyPi](https://img.shields.io/pypi/v/dataglasses)](https://pypi.python.org/pypi/dataglasses)
+[![Python](https://img.shields.io/pypi/pyversions/dataglasses)](https://pypi.python.org/pypi/dataglasses)
+[![License](https://img.shields.io/pypi/l/dataglasses)](LICENSE)
 [![Actions status](https://img.shields.io/github/actions/workflow/status/Udzu/dataglasses/quality_checks.yaml?logo=github&label=quality%20checks)](https://github.com/Udzu/dataglasses/actions/workflows/quality_checks.yaml)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
@@ -687,4 +687,4 @@ Person(name='Robert!', aliases={'Bobby', 'Bob'})
 
 ## Contributions
 
-Bug reports, feature requests and contributions are very welcome. Note that PRs must include tests and pass the quality checks [defined here](.github/workflows/quality_checks.yaml). More development details will be added shortly, once the project has stabilised...
+Bug reports, feature requests and contributions are very welcome. Note that PRs must include tests with 100% code coverage and pass the quality checks [defined here](.github/workflows/quality_checks.yaml). More development details will be added shortly, once the project has stabilised...

@@ -1,5 +1,11 @@
 # dataglasses
 
+[![License](https://img.shields.io/pypi/l/dataglasses.svg)](LICENSE)
+[![PyPi](https://img.shields.io/pypi/v/dataglasses.svg)](https://pypi.python.org/pypi/dataglasses)
+[![Python](https://img.shields.io/pypi/pyversions/dataglasses.svg)](https://pypi.python.org/pypi/dataglasses)
+[![Actions status](https://img.shields.io/github/actions/workflow/status/Udzu/dataglasses/quality_checks.yaml?logo=github&label=quality%20checks)](https://github.com/Udzu/dataglasses/actions/workflows/quality_checks.yaml)
+[![Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+
 A small package to simplify creating dataclasses from JSON and validating that JSON.
 
 ## Installation

@@ -587,7 +587,7 @@ Forward reference types (written as string literals or `ForwardRef` objects) are
 ```
 </details>
 
-Locally-scoped references, meanwhile, must be passed in using the `local_refs` arguments:
+Locally-scoped references, however, must be specified using the `local_refs` keyword:
 
 ```python
 >>> def reverse_cons(seq):
@@ -601,8 +601,7 @@ Locally-scoped references, meanwhile, must be passed in using the `local_refs` a
 ...             return f"{self.head}::{self.tail}"
 ... 
 ...     value = None
-...     for x in seq:
-...         value = { "head": x, "tail": value }
+...     for x in seq: value = { "head": x, "tail": value }
 ...     return from_dict(Cons, value, local_refs={Cons})
 
 >>> reverse_cons([1,2,3])

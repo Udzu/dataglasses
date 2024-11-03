@@ -440,45 +440,68 @@ def test_transform(transform: TransformRules, output: DataclassTransform) -> Non
 
 
 @dataclass
-class DataclassUnsupportedInSchema:
+class DataclassUntypedCollections:
     a: list
     b: set
+
+
+@dataclass
+class DataclassAny:
     c: Any
+
+
+@dataclass
+class DataclassNonStringMapping:
     d: Mapping[int, int]
 
 
-def test_unsupported_in_schema_types() -> None:
-    value = {"a": [1, "?"], "b": {2, "!"}, "c": 1, "d": {1: 2}}
-    data = from_dict(DataclassUnsupportedInSchema, value)
-    assert data == DataclassUnsupportedInSchema([1, "?"], {2, "!"}, 1, {1: 2})
-    for value in [
-        {"a": {1, "?"}, "b": {2, "!"}, "c": 1, "d": {1: 2}},
-        {"a": [], "b": {}, "c": 1, "d": {1: 2}},
-        {"a": [], "b": {}, "c": 1, "d": {"1": 2}},
-    ]:
-        assert_invalid_value(
-            DataclassUnsupportedInSchema,
-            value,
-            "value, got",
-            valid_schema=False,
-        )
+@pytest.mark.parametrize(
+    ("cls", "valid_input", "invalid_input"),
+    [
+        (DataclassUntypedCollections, {"a": ["?"], "b": {"!"}}, {"a": [], "b": [2]}),
+        (DataclassAny, {"c": None}, None),
+        (DataclassNonStringMapping, {"d": {1: 2}}, {"d": {"1": 2}}),
+    ],
+)
+def test_unsupported_in_schema_types(
+    cls: type, valid_input: Any, invalid_input: Any
+) -> None:
+    data: Any = from_dict(cls, valid_input)
+    assert data == cls(*valid_input.values())
+    if invalid_input is not None:
+        assert_invalid_value(cls, invalid_input, "value, got", valid_schema=False)
 
 
-def test_unsupported_in_schema_transform() -> None:
-    transform: TransformRules = {
-        list: (list[int | str], lambda x: x),
-        set: (list[int | str], set),
-        Any: (int, str),  # type:ignore[dict-item]
-        Mapping[int, int]: (
-            dict[str, int],
-            lambda d: {int(k): v for k, v in d.items()},
+@pytest.mark.parametrize(
+    ("cls", "transform", "input_value", "output"),
+    [
+        (
+            DataclassUntypedCollections,
+            {list: (list[int | str], lambda x: x), set: (list[int | str], set)},
+            {"a": [1, "?"], "b": [2, "!"]},
+            DataclassUntypedCollections([1, "?"], {2, "!"}),
         ),
-    }
-    value = {"a": [1, "?"], "b": [2, "!"], "c": 1, "d": {"1": 2}}
-    data = from_dict(DataclassUnsupportedInSchema, value, transform=transform)
-    assert data == DataclassUnsupportedInSchema([1, "?"], {2, "!"}, "1", {1: 2})
+        (DataclassAny, {Any: (int, str)}, {"c": 1}, DataclassAny("1")),
+        (
+            DataclassNonStringMapping,
+            {
+                Mapping[int, int]: (
+                    dict[str, int],
+                    lambda d: {int(k) + 1: v for k, v in d.items()},
+                )
+            },
+            {"d": {"1": 2}},
+            DataclassNonStringMapping({2: 2}),
+        ),
+    ],
+)
+def test_unsupported_in_schema_transform(
+    cls: type, transform: TransformRules, input_value: dict[str, Any], output: object
+) -> None:
+    data: Any = from_dict(cls, input_value, transform=transform)
+    assert data == output
     schema = to_json_schema(type(data), transform=transform)
-    validate(value, schema)
+    validate(input_value, schema)
 
 
 @dataclass

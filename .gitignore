@@ -11,3 +11,8 @@ wheels/
 
 # Intellij files
 .idea/
+
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/

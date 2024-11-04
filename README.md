@@ -11,7 +11,7 @@ A small package to simplify creating dataclasses from JSON and validating that J
 
 ## Installation
 
-```
+```bash
 $ pip install dataglasses
 ```
 
@@ -722,4 +722,22 @@ Person(name='Robert!', aliases={'Bobby', 'Bob'})
 
 ## Contributions
 
-Bug reports, feature requests and contributions are very welcome. Note that PRs must include tests with 100% code coverage and pass the quality checks [defined here](.github/workflows/quality_checks.yaml). More development details will be added shortly, once the project has stabilised...
+Bug reports, feature requests and contributions are very welcome. Note that PRs must include tests with 100% code coverage and pass the necessary [quality checks](.github/workflows/quality_checks.yaml) before they can be merged.
+
+To run the tests, make sure you have [uv](https://docs.astral.sh/uv/) installed, then type:
+
+```bash
+$ uv run task tests
+```
+
+To perform the formatting and linting checks, type:
+
+```bash
+$ uv run task check
+```
+
+To automatically resolve automatically fixable formatting and linting issues, type:
+
+```bash
+$ uv run task format
+```

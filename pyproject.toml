@@ -1,14 +1,12 @@
 [project]
 name = "dataglasses"
 version = "0.6.0"
+dependencies = []
+requires-python = ">=3.10"
+authors = [{ name = "Uri Granta", email = "uri.granta+python@gmail.com" }]
 description = "Simple creation of dataclasses from JSON"
 readme = "README.md"
-authors = [
-    { name = "Uri Granta", email = "uri.granta+python@gmail.com" }
-]
-requires-python = ">=3.10"
-dependencies = []
-license = {text = "MIT"}
+license = { text = "MIT" }
 keywords = ["dataclasses", "json", "json schema"]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -30,26 +28,26 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "jsonschema>=4.23.0",
-    "mypy>=1.13.0",
-    "pytest-cov>=6.0.0",
-    "pytest-mypy>=0.10.3",
-    "pytest>=8.3.3",
-    "ruff>=0.7.1",
-    "taskipy>=1.14.0",
-    "types-jsonschema>=4.23.0.20240813",
+  "jsonschema>=4.23.0",
+  "mypy>=1.13.0",
+  "pytest-cov>=6.0.0",
+  "pytest-mypy>=0.10.3",
+  "pytest>=8.3.3",
+  "ruff>=0.7.1",
+  "taskipy>=1.14.0",
+  "types-jsonschema>=4.23.0.20240813",
 ]
 
 [tool.ruff.lint]
 select = [
-    "F",  # pyflakes
-    "E",  # pycodestyle (errors)
-    "W",  # pycodestyle (warnings)
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "PT",  # flake8-pytest-style
-    "SIM",  # flake8-simplify
+  "F",   # pyflakes
+  "E",   # pycodestyle (errors)
+  "W",   # pycodestyle (warnings)
+  "I",   # isort
+  "B",   # flake8-bugbear
+  "C4",  # flake8-comprehensions
+  "PT",  # flake8-pytest-style
+  "SIM", # flake8-simplify
 ]
 
 [tool.taskipy.tasks]

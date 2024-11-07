@@ -74,7 +74,7 @@ InventoryItem(name='widget', unit_price=3.0, quantity_on_hand=0)
 
 ## Objective
 
-The purpose of this library is to speed up rapid development by making it trivial to populate type-annotated dataclasses with dictionary data extracted from JSON, as well as to perform basic validation on that data. The library contains just one file and two functions, so can even be directly copied into a project.
+The purpose of this library is to speed up rapid development by making it trivial to populate dataclasses with dictionary data extracted from JSON (or elsewhere), as well as to perform basic validation on that data. The library contains just one file and two functions, so can even be directly copied into a project.
 
 It is not intended for complex validation or high performance. For those, consider using [pydantic](https://github.com/pydantic/pydantic).
 
@@ -103,7 +103,7 @@ def to_json_schema(
     local_refs: Optional[set[type]] = None,
 ) -> dict[str, Any]:
 ```
-This generates a JSON schema representing valid inputs for the dataclass type `cls`, raising an exception if the class cannot be represented in JSON.  (Again, the optional keyword arguments are described further down.)
+This generates a 2020-12 JSON schema representing valid inputs for the dataclass type `cls`, raising an exception if the class cannot be represented in JSON.  (Again, the optional keyword arguments are described further down.)
 
 Below is a summary of the different supported use cases:
 

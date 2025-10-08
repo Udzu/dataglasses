@@ -105,7 +105,7 @@ def from_dict(
                 datacls,
             )
 
-        origin = get_origin(cls)
+        origin = cast(type, get_origin(cls))
 
         if origin in transform and not transformed:
             input_type, fn = transform[origin]
@@ -278,7 +278,7 @@ def to_json_schema(
             evaluated_type = cast(type, ref._evaluate(_globals, _locals, frozenset()))
             return _json_schema(evaluated_type, datacls)
 
-        origin = get_origin(cls)
+        origin = cast(type, get_origin(cls))
 
         if origin in transform and not transformed:
             input_type, _ = transform[origin]

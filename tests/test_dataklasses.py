@@ -455,7 +455,7 @@ class DataclassTransformGeneric:
 
 def test_transform_generic() -> None:
     value = {"a": ["a", "b"], "b": [1, 2], "c": [0.5, 0.7]}
-    transform = {
+    transform: TransformRules = {
         set: (list[str | int], set),
         set[float]: (list[float], lambda l: set(l) | {0.0}),
     }

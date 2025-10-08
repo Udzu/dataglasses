@@ -457,7 +457,7 @@ def test_transform_generic() -> None:
     value = {"a": ["a", "b"], "b": [1, 2], "c": [0.5, 0.7]}
     transform: TransformRules = {
         set: (list[str | int], set),
-        set[float]: (list[float], lambda l: set(l) | {0.0}),
+        set[float]: (list[float], lambda lst: set(lst) | {0.0}),
     }
     data = from_dict(DataclassTransformGeneric, value, transform=transform)
     assert data == DataclassTransformGeneric({"a", "b"}, {1, 2}, {0.0, 0.5, 0.7})

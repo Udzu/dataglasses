@@ -1,6 +1,6 @@
 [project]
 name = "dataglasses"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = []
 requires-python = ">=3.10"
 authors = [{ name = "Uri Granta", email = "uri.granta+python@gmail.com" }]

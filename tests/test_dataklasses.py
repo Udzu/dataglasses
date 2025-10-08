@@ -446,6 +446,25 @@ def test_transform(transform: TransformRules, output: DataclassTransform) -> Non
     validate(value, schema)
 
 
+@dataclass
+class DataclassTransformGeneric:
+    a: set[str]
+    b: set[int]
+    c: set[float]
+
+
+def test_transform_generic() -> None:
+    value = {"a": ["a", "b"], "b": [1, 2], "c": [0.5, 0.7]}
+    transform = {
+        set: (list[str | int], set),
+        set[float]: (list[float], lambda l: set(l) | {0.0}),
+    }
+    data = from_dict(DataclassTransformGeneric, value, transform=transform)
+    assert data == DataclassTransformGeneric({"a", "b"}, {1, 2}, {0.0, 0.5, 0.7})
+    schema = to_json_schema(DataclassTransformGeneric, transform=transform)
+    validate(value, schema)
+
+
 # =================
 # UNSUPPORTED TYPES
 # =================

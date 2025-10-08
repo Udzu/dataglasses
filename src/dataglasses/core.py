@@ -107,6 +107,10 @@ def from_dict(
 
         origin = get_origin(cls)
 
+        if origin in transform and not transformed:
+            input_type, fn = transform[origin]
+            return fn(_from_dict(input_type, value, datacls, transformed=True))
+
         if origin in (collections.abc.Sequence, list):
             if not isinstance(value, Sequence):
                 raise TypeError(
@@ -275,6 +279,10 @@ def to_json_schema(
             return _json_schema(evaluated_type, datacls)
 
         origin = get_origin(cls)
+
+        if origin in transform and not transformed:
+            input_type, _ = transform[origin]
+            return _json_schema(input_type, datacls, transformed=True)
 
         if origin in (collections.abc.Sequence, list):
             sequence_type = get_args(cls)[0]

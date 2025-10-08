@@ -1,6 +1,7 @@
 import collections
 import dataclasses
 import inspect
+import sys
 from enum import Enum
 from types import NoneType, UnionType
 from typing import (
@@ -20,6 +21,11 @@ from typing import (
     get_origin,
 )
 
+try:
+    from typing import TypeAliasType  # type: ignore
+except ImportError:  # pragma: no cover
+    TypeAliasType = type("TypeAliasTypeNotImplemented", (), {})  # type: ignore
+
 T = TypeVar("T")
 
 TransformRules: TypeAlias = Mapping[type | tuple[type, str], tuple[type, Callable]]
@@ -29,6 +35,18 @@ an output type annotation (e.g. `int` or `list[str]`) or a dataclass-and-fieldna
 (e.g. `(InventoryItem, "name")`) to a tuple containing an intermediate type annotation
 and a function to transform values from that type into the output type.
 """
+
+
+def evaluate_forward_ref(
+    ref: ForwardRef, globals: Mapping[str, Any], locals: Mapping[str, Any]
+) -> type:
+    """
+    Evaluate a ForwardRef, something that's not currently exposed publicly.
+    """
+    if sys.version_info < (3, 12, 4):
+        return ref._evaluate(globals, locals, frozenset())  # type: ignore   # pragma: no cover
+
+    return ref._evaluate(globals, locals, frozenset(), recursive_guard=set())  # type: ignore  # pragma: no cover
 
 
 def from_dict(
@@ -100,10 +118,13 @@ def from_dict(
             if local_refs is not None:
                 _locals = _locals | {c.__name__: c for c in local_refs}
             return _from_dict(
-                ref._evaluate(_globals, _locals, frozenset()),
+                evaluate_forward_ref(ref, _globals, _locals),
                 value,
                 datacls,
             )
+
+        elif isinstance(cls, TypeAliasType):  # pragma: no cover
+            return _from_dict(cls.__value__, value, datacls)
 
         origin = cast(type, get_origin(cls))
 
@@ -275,8 +296,11 @@ def to_json_schema(
             _locals = datacls.__dict__
             if local_refs is not None:
                 _locals = _locals | {c.__name__: c for c in local_refs}
-            evaluated_type = cast(type, ref._evaluate(_globals, _locals, frozenset()))
+            evaluated_type = evaluate_forward_ref(ref, _globals, _locals)
             return _json_schema(evaluated_type, datacls)
+
+        if isinstance(cls, TypeAliasType):  # pragma: no cover
+            return _json_schema(cls.__value__, datacls)
 
         origin = cast(type, get_origin(cls))
 

@@ -1,4 +1,5 @@
 import json
+import sys
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
 from types import MappingProxyType
@@ -463,6 +464,28 @@ def test_transform_generic() -> None:
     assert data == DataclassTransformGeneric({"a", "b"}, {1, 2}, {0.0, 0.5, 0.7})
     schema = to_json_schema(DataclassTransformGeneric, transform=transform)
     validate(value, schema)
+
+
+# ============
+# TYPE ALIASES
+# ============
+
+if sys.version_info >= (3, 12):  # pragma: no cover
+    exec("type TypeAliasList = list[int]")
+    exec("type TypeAliasSet = set[int]")
+
+    @dataclass
+    class DataclassTypeAlias:
+        a: TypeAliasList  # type: ignore  # noqa: F821
+        b: TypeAliasSet  # type: ignore  # noqa: F821
+
+    def test_transform_type_alias() -> None:
+        value = {"a": [1, 2], "b": [3, 4]}
+        transform: TransformRules = {set: (list[int], set)}
+        data = from_dict(DataclassTypeAlias, value, transform=transform)
+        assert data == DataclassTypeAlias([1, 2], {3, 4})
+        schema = to_json_schema(DataclassTypeAlias, transform=transform)
+        validate(value, schema)
 
 
 # =================

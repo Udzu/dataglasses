@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version < '3.11'",
@@ -89,10 +90,10 @@ toml = [
 
 [[package]]
 name = "dataglasses"
-version = "0.6.0"
+version = "0.8.0"
 source = { editable = "." }
 
-[package.dependency-groups]
+[package.dev-dependencies]
 dev = [
     { name = "jsonschema" },
     { name = "mypy" },
@@ -106,7 +107,7 @@ dev = [
 
 [package.metadata]
 
-[package.metadata.dependency-groups]
+[package.metadata.requires-dev]
 dev = [
     { name = "jsonschema", specifier = ">=4.23.0" },
     { name = "mypy", specifier = ">=1.13.0" },

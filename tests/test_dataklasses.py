@@ -476,8 +476,8 @@ if sys.version_info >= (3, 12):  # pragma: no cover
 
     @dataclass
     class DataclassTypeAlias:
-        a: TypeAliasList  # type: ignore
-        b: TypeAliasSet  # type: ignore
+        a: TypeAliasList  # type: ignore  # noqa: F821
+        b: TypeAliasSet  # type: ignore  # noqa: F821
 
     def test_transform_type_alias() -> None:
         value = {"a": [1, 2], "b": [3, 4]}

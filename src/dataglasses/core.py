@@ -20,6 +20,11 @@ from typing import (
     get_origin,
 )
 
+try:
+    from typing import TypeAliasType  # type: ignore
+except ImportError:  # pragma: no cover
+    TypeAliasType = type("TypeAliasTypeNotImplemented", (), {})  # type: ignore
+
 T = TypeVar("T")
 
 TransformRules: TypeAlias = Mapping[type | tuple[type, str], tuple[type, Callable]]
@@ -104,6 +109,9 @@ def from_dict(
                 value,
                 datacls,
             )
+
+        elif isinstance(cls, TypeAliasType):  # pragma: no cover
+            return _from_dict(cls.__value__, value, datacls)
 
         origin = cast(type, get_origin(cls))
 
@@ -277,6 +285,9 @@ def to_json_schema(
                 _locals = _locals | {c.__name__: c for c in local_refs}
             evaluated_type = cast(type, ref._evaluate(_globals, _locals, frozenset()))
             return _json_schema(evaluated_type, datacls)
+
+        if isinstance(cls, TypeAliasType):  # pragma: no cover
+            return _json_schema(cls.__value__, datacls)
 
         origin = cast(type, get_origin(cls))
 
